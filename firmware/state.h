@@ -27,6 +27,7 @@ struct AppState {
   MascotState state       = STATE_BOOT;
   ToolIcon    tool        = TOOL_NONE;
   char        message[64] = "Booting...";
+  char        client[24]  = "claude-code";
   uint32_t    tokensUsed  = 0;
   uint32_t    tokensMax   = 0;
   uint32_t    lastUpdateMs= 0;

@@ -38,12 +38,16 @@ static void handleState() {
   const char* st   = doc["state"]   | "";
   const char* tool = doc["tool"]    | "";
   const char* msg  = doc["message"] | "";
+  const char* client = doc["client"] | "";
   uint32_t used    = doc["tokens"]["used"] | 0;
   uint32_t maxv    = doc["tokens"]["max"]  | 0;
 
   g_state.state = parseStateName(st);
   g_state.tool  = parseToolName(tool);
   copyStr(g_state.message, sizeof(g_state.message), msg);
+  if (client && *client) {
+    copyStr(g_state.client, sizeof(g_state.client), client);
+  }
   if (maxv > 0) {
     g_state.tokensUsed = used;
     g_state.tokensMax  = maxv;
@@ -59,6 +63,7 @@ static void handleGet() {
   doc["state"]   = stateName(g_state.state);
   doc["tool"]    = toolName(g_state.tool);
   doc["message"] = g_state.message;
+  doc["client"]  = g_state.client;
   doc["tokens"]["used"] = g_state.tokensUsed;
   doc["tokens"]["max"]  = g_state.tokensMax;
   doc["uptime_ms"]      = millis();
@@ -76,6 +81,8 @@ static void handleRoot() {
   html += stateName(g_state.state);
   html += "</b></p><p>Tool: ";
   html += toolName(g_state.tool);
+  html += "</p><p>Client: ";
+  html += g_state.client;
   html += "</p><p>Message: ";
   html += g_state.message;
   html += "</p><pre>curl -X POST http://";
