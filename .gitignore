@@ -17,3 +17,6 @@ firmware/config.h
 
 # Python
 __pycache__
+
+# Local configuration files
+.local
