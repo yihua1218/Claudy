@@ -7,11 +7,17 @@
 #include <WebServer.h>
 #include <ESPmDNS.h>
 #include <ArduinoJson.h>
+#include <esp_system.h>
+#include <soc/rtc_cntl_reg.h>
+#include <soc/soc.h>
 
 extern AppState g_state;
 
 static WebServer server(HTTP_PORT);
 static bool s_connected = false;
+static bool s_rebootPending = false;
+static bool s_bootloaderPending = false;
+static uint32_t s_rebootAtMs = 0;
 
 static bool authOk() {
   if (strlen(AUTH_TOKEN) == 0) return true;
@@ -39,6 +45,7 @@ static void handleState() {
   const char* tool = doc["tool"]    | "";
   const char* msg  = doc["message"] | "";
   const char* client = doc["client"] | "";
+  const char* model = doc["model"] | "";
   uint32_t used    = doc["tokens"]["used"] | 0;
   uint32_t maxv    = doc["tokens"]["max"]  | 0;
 
@@ -47,6 +54,9 @@ static void handleState() {
   copyStr(g_state.message, sizeof(g_state.message), msg);
   if (client && *client) {
     copyStr(g_state.client, sizeof(g_state.client), client);
+  }
+  if (model && *model) {
+    copyStr(g_state.model, sizeof(g_state.model), model);
   }
   if (maxv > 0) {
     g_state.tokensUsed = used;
@@ -64,6 +74,11 @@ static void handleGet() {
   doc["tool"]    = toolName(g_state.tool);
   doc["message"] = g_state.message;
   doc["client"]  = g_state.client;
+  doc["model"]   = g_state.model;
+  doc["touch"]["present"] = g_state.touchPresent;
+  doc["touch"]["locked"]  = g_state.touchLocked;
+  doc["ui"]["view"]       = g_state.uiView;
+  doc["ui"]["brightness"] = g_state.brightness;
   doc["tokens"]["used"] = g_state.tokensUsed;
   doc["tokens"]["max"]  = g_state.tokensMax;
   doc["uptime_ms"]      = millis();
@@ -71,6 +86,89 @@ static void handleGet() {
   String out;
   serializeJson(doc, out);
   server.send(200, "application/json", out);
+}
+
+static void put16(uint8_t* p, uint16_t v) {
+  p[0] = v & 0xFF;
+  p[1] = (v >> 8) & 0xFF;
+}
+
+static void put32(uint8_t* p, uint32_t v) {
+  p[0] = v & 0xFF;
+  p[1] = (v >> 8) & 0xFF;
+  p[2] = (v >> 16) & 0xFF;
+  p[3] = (v >> 24) & 0xFF;
+}
+
+static void handleScreenshot() {
+  if (!canvas.getBuffer()) {
+    server.send(503, "text/plain", "canvas not ready");
+    return;
+  }
+
+  renderFrame();
+
+  const int32_t w = canvas.width();
+  const int32_t h = canvas.height();
+  const uint32_t rowSize = ((uint32_t)w * 3 + 3) & ~3U;
+  const uint32_t pixelBytes = rowSize * h;
+  const uint32_t fileSize = 54 + pixelBytes;
+
+  uint8_t header[54] = {0};
+  header[0] = 'B';
+  header[1] = 'M';
+  put32(header + 2, fileSize);
+  put32(header + 10, 54);
+  put32(header + 14, 40);                // BITMAPINFOHEADER
+  put32(header + 18, w);
+  put32(header + 22, h);                 // positive = bottom-up rows
+  put16(header + 26, 1);
+  put16(header + 28, 24);                // BGR888
+  put32(header + 34, pixelBytes);
+  put32(header + 38, 2835);              // 72 DPI
+  put32(header + 42, 2835);
+
+  WiFiClient client = server.client();
+  client.print("HTTP/1.1 200 OK\r\n");
+  client.print("Content-Type: image/bmp\r\n");
+  client.print("Content-Disposition: inline; filename=claudy.bmp\r\n");
+  client.print("Cache-Control: no-store\r\n");
+  client.printf("Content-Length: %lu\r\n", (unsigned long)fileSize);
+  client.print("Connection: close\r\n\r\n");
+  client.write(header, sizeof(header));
+
+  uint8_t row[3 * 320 + 3];
+  for (int32_t y = h - 1; y >= 0; --y) {
+    uint32_t i = 0;
+    for (int32_t x = 0; x < w; ++x) {
+      uint16_t c = canvas.readPixelValue(x, y);
+      row[i++] = (uint8_t)((c & 0x001F) * 255 / 31);          // B
+      row[i++] = (uint8_t)(((c >> 5) & 0x003F) * 255 / 63);   // G
+      row[i++] = (uint8_t)(((c >> 11) & 0x001F) * 255 / 31);  // R
+    }
+    while (i < rowSize) row[i++] = 0;
+    client.write(row, rowSize);
+    delay(0);
+  }
+}
+
+static void scheduleReboot(bool bootloader) {
+  s_rebootPending = true;
+  s_bootloaderPending = bootloader;
+  s_rebootAtMs = millis() + 500;
+  server.send(200, "application/json", bootloader
+    ? "{\"ok\":true,\"mode\":\"bootloader\",\"delay_ms\":500}"
+    : "{\"ok\":true,\"mode\":\"reboot\",\"delay_ms\":500}");
+}
+
+static void handleReboot() {
+  if (!authOk()) { server.send(401, "text/plain", "auth"); return; }
+  scheduleReboot(false);
+}
+
+static void handleBootloader() {
+  if (!authOk()) { server.send(401, "text/plain", "auth"); return; }
+  scheduleReboot(true);
 }
 
 static void handleRoot() {
@@ -83,8 +181,12 @@ static void handleRoot() {
   html += toolName(g_state.tool);
   html += "</p><p>Client: ";
   html += g_state.client;
+  html += "</p><p>Model: ";
+  html += g_state.model;
   html += "</p><p>Message: ";
   html += g_state.message;
+  html += "</p><p><a href=\"/screenshot.bmp\">screenshot.bmp</a></p>";
+  html += "<p>Control: <code>POST /reboot</code>, <code>POST /bootloader</code></p>";
   html += "</p><pre>curl -X POST http://";
   html += MDNS_HOSTNAME;
   html += ".local/state -H 'Content-Type: application/json' \\\n  -d '{\"state\":\"thinking\",\"message\":\"hello\"}'</pre>";
@@ -125,6 +227,9 @@ bool netBegin() {
   server.on("/",       HTTP_GET,  handleRoot);
   server.on("/state",  HTTP_GET,  handleGet);
   server.on("/state",  HTTP_POST, handleState);
+  server.on("/screenshot.bmp", HTTP_GET, handleScreenshot);
+  server.on("/reboot", HTTP_POST, handleReboot);
+  server.on("/bootloader", HTTP_POST, handleBootloader);
   server.onNotFound([]() { server.send(404, "text/plain", "not found"); });
   server.begin();
   Serial.printf("HTTP: listening on :%d\n", HTTP_PORT);
@@ -135,6 +240,13 @@ bool netBegin() {
 
 void netLoop() {
   server.handleClient();
+  if (s_rebootPending && (int32_t)(millis() - s_rebootAtMs) >= 0) {
+    if (s_bootloaderPending) {
+      REG_SET_BIT(RTC_CNTL_OPTION1_REG, RTC_CNTL_FORCE_DOWNLOAD_BOOT);
+    }
+    delay(20);
+    esp_restart();
+  }
 }
 
 bool netIsConnected() {

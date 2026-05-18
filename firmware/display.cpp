@@ -1,6 +1,17 @@
 #include "display.h"
 #include "state.h"
 #include "mascot.h"
+#include "config.h"
+
+#ifndef ENABLE_CODEX_UI
+#define ENABLE_CODEX_UI 0
+#endif
+
+#if ENABLE_CODEX_UI
+#include "touch.h"
+
+#include <WiFi.h>
+#endif
 
 LGFX tft;
 lgfx::LGFX_Sprite canvas(&tft);
@@ -114,6 +125,78 @@ static void drawToolBadge(int x, int y, int w, int h, ToolIcon t) {
   canvas.drawString(glyph, x + w / 2, y + h / 2);
 }
 
+#if ENABLE_CODEX_UI
+static bool isCodexClient() {
+  return strstr(g_state.client, "codex") != nullptr;
+}
+
+static bool isVSCodeCodex() {
+  return strstr(g_state.client, "vscode") != nullptr;
+}
+
+static uint16_t clientAccent() {
+  if (isVSCodeCodex()) return 0x04BF;   // VS Code-ish blue
+  if (isCodexClient()) return 0x05FF;   // cyan
+  return 0xCC2D;                        // Claude orange
+}
+
+static void drawCodexMotif(int x, int y, int w, int h) {
+  if (!isCodexClient()) return;
+  uint16_t c = clientAccent();
+  const int l = 18;
+  canvas.drawLine(x, y, x + l, y, c);
+  canvas.drawLine(x, y, x, y + l, c);
+  canvas.drawLine(x + w - l, y, x + w, y, c);
+  canvas.drawLine(x + w, y, x + w, y + l, c);
+  canvas.drawLine(x, y + h - l, x, y + h, c);
+  canvas.drawLine(x, y + h, x + l, y + h, c);
+  canvas.drawLine(x + w - l, y + h, x + w, y + h, c);
+  canvas.drawLine(x + w, y + h - l, x + w, y + h, c);
+
+  canvas.setFont(&fonts::Font2);
+  canvas.setTextDatum(top_left);
+  canvas.setTextColor(c, TFT_BLACK);
+  canvas.drawString(">_", x + 6, y + 5);
+}
+
+static void drawClientBadge(int right, int y) {
+  const char* label = isVSCodeCodex() ? "CODEX" : (isCodexClient() ? "CX" : "CL");
+  uint16_t c = clientAccent();
+  int w = isVSCodeCodex() ? 50 : 28;
+  int x = right - w;
+  canvas.fillRoundRect(x, y, w, 15, 4, c);
+  canvas.setFont(&fonts::Font0);
+  canvas.setTextDatum(middle_center);
+  canvas.setTextColor(TFT_WHITE, c);
+  canvas.drawString(label, x + w / 2, y + 7);
+}
+
+static void drawTouchPill(int x, int y) {
+  uint16_t bg = g_state.touchLocked ? 0x7BEF : (g_state.touchPresent ? clientAccent() : 0x3186);
+  canvas.fillRoundRect(x, y, 36, 14, 4, bg);
+  canvas.setFont(&fonts::Font0);
+  canvas.setTextDatum(middle_center);
+  canvas.setTextColor(TFT_WHITE, bg);
+  canvas.drawString(g_state.touchLocked ? "LOCK" : (g_state.touchPresent ? "TAP" : "NO T"), x + 18, y + 7);
+}
+
+static void drawSmallLine(const char* label, const char* value, int x, int y, int w) {
+  canvas.setFont(&fonts::Font2);
+  canvas.setTextDatum(top_left);
+  canvas.setTextColor(0x8C71, TFT_BLACK);
+  canvas.drawString(label, x, y);
+  canvas.setTextColor(0xDFFF, TFT_BLACK);
+  char buf[54];
+  strncpy(buf, value ? value : "", sizeof(buf) - 1);
+  buf[sizeof(buf) - 1] = 0;
+  while (canvas.textWidth(buf) > w - 42 && strlen(buf) > 4) {
+    size_t n = strlen(buf);
+    buf[n - 1] = 0;
+  }
+  canvas.drawString(buf, x + 42, y);
+}
+#endif
+
 void renderFrame() {
   bool animating = mascotAnimating(g_state.state);
   if (!s_dirty && !animating) return;
@@ -141,7 +224,13 @@ void renderFrame() {
   const int ly = PAD;
   const int lw = MASCOT_W;
   const int lh = H - 2 * PAD;
+#if ENABLE_CODEX_UI
+  drawCodexMotif(lx - 3, ly - 3, lw + 6, lh + 6);
+#endif
   drawMascot(canvas, g_state.state, lx, ly, lw, lh);
+#if ENABLE_CODEX_UI
+  drawTouchPill(lx, H - PAD - 14);
+#endif
 
   // Right column
   const int tx = lx + lw + GAP;
@@ -154,6 +243,9 @@ void renderFrame() {
   canvas.setTextDatum(top_left);
   canvas.setFont(&fonts::FreeSansBold18pt7b);
   canvas.drawString(stateName(g_state.state), tx, ty + STATE_Y);
+#if ENABLE_CODEX_UI
+  drawClientBadge(W - PAD, ty + 4);
+#endif
 
   // Tool chip + label
   int cursorY = ty + CHIP_Y;
@@ -174,7 +266,21 @@ void renderFrame() {
   canvas.setFont(&fonts::efontTW_16);
   canvas.setTextColor(0xBDF7, TFT_BLACK);
   canvas.setTextDatum(top_left);
-  {
+#if ENABLE_CODEX_UI
+  if (g_state.uiView == 1) {
+    drawSmallLine("client", g_state.client, tx, cursorY, tw);
+    drawSmallLine("model", g_state.model[0] ? g_state.model : "-", tx, cursorY + 17, tw);
+    drawSmallLine("ip", WiFi.localIP().toString().c_str(), tx, cursorY + 34, tw);
+    drawSmallLine("touch", touchConfigName(), tx, cursorY + 51, tw);
+  } else if (g_state.uiView == 2) {
+    canvas.setFont(&fonts::Font2);
+    canvas.setTextColor(0xBDF7, TFT_BLACK);
+    canvas.drawString("tap mascot: view", tx, cursorY);
+    canvas.drawString("tap text: pin 30s", tx, cursorY + 16);
+    canvas.drawString("swipe up/down: light", tx, cursorY + 32);
+    canvas.drawString("hold: lock touch", tx, cursorY + 48);
+  } else {
+#endif
     char buf[80];
     strncpy(buf, g_state.message, sizeof(buf) - 1);
     buf[sizeof(buf) - 1] = 0;
@@ -216,7 +322,23 @@ void renderFrame() {
       while (pos < len && buf[pos] == ' ') pos++;   // skip leading spaces
       y += lineH;
     }
+#if ENABLE_CODEX_UI
   }
+
+  if (millis() < g_state.uiHoldUntilMs && g_state.touchHint[0]) {
+    uint16_t c = g_state.touchLocked ? 0x7BEF : clientAccent();
+    int hintW = canvas.textWidth(g_state.touchHint) + 12;
+    if (hintW < 54) hintW = 54;
+    if (hintW > tw) hintW = tw;
+    int hx = tx;
+    int hy = ty + th - 44;
+    canvas.fillRoundRect(hx, hy, hintW, 17, 5, c);
+    canvas.setFont(&fonts::Font0);
+    canvas.setTextDatum(middle_center);
+    canvas.setTextColor(TFT_WHITE, c);
+    canvas.drawString(g_state.touchHint, hx + hintW / 2, hy + 8);
+  }
+#endif
 
   // Token area
   if (g_state.tokensMax > 0) {

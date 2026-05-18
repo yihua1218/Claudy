@@ -10,6 +10,9 @@ SETTINGS="${CODEX_HOOKS:-$HOME/.codex/hooks.json}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 BRIDGE_CMD="$HERE/send-codex-state.sh"
 CLIENT="${CLAUDY_CLIENT:-codex-vscode-remote}"
+URL="${CLAUDY_URL:-}"
+TOKEN="${CLAUDY_TOKEN:-}"
+MAX_TOKENS="${CLAUDY_MAX_TOKENS:-}"
 
 mkdir -p "$(dirname "$SETTINGS")"
 if [ ! -f "$SETTINGS" ]; then
@@ -23,14 +26,18 @@ BACKUP="$SETTINGS.bak.$(date +%Y%m%d%H%M%S)"
 cp "$SETTINGS" "$BACKUP"
 echo "Backed up $SETTINGS -> $BACKUP"
 
-python3 - "$SETTINGS" "$BRIDGE_CMD" "$CLIENT" <<'PY'
+python3 - "$SETTINGS" "$BRIDGE_CMD" "$CLIENT" "$URL" "$TOKEN" "$MAX_TOKENS" <<'PY'
 import json
 import pathlib
+import shlex
 import sys
 
 settings_path = pathlib.Path(sys.argv[1])
 bridge_cmd = sys.argv[2]
 client = sys.argv[3]
+url = sys.argv[4]
+token = sys.argv[5]
+max_tokens = sys.argv[6]
 
 events = [
     "SessionStart",
@@ -47,7 +54,15 @@ except json.JSONDecodeError as exc:
     raise SystemExit(f"{settings_path} is not valid JSON: {exc}") from exc
 
 hooks = data.setdefault("hooks", {})
-command = f"CLAUDY_CLIENT={client} {bridge_cmd}"
+env = {"CLAUDY_CLIENT": client}
+if url:
+    env["CLAUDY_URL"] = url
+if token:
+    env["CLAUDY_TOKEN"] = token
+if max_tokens:
+    env["CLAUDY_MAX_TOKENS"] = max_tokens
+command = " ".join(f"{key}={shlex.quote(value)}" for key, value in env.items())
+command = f"{command} {shlex.quote(bridge_cmd)}"
 added = 0
 
 for event in events:

@@ -28,9 +28,16 @@ struct AppState {
   ToolIcon    tool        = TOOL_NONE;
   char        message[64] = "Booting...";
   char        client[24]  = "claude-code";
+  char        model[40]   = "";
+  char        touchHint[32] = "";
+  uint8_t     uiView      = 0;     // 0=status, 1=client info, 2=touch help
+  uint8_t     brightness  = 200;
+  bool        touchPresent= false;
+  bool        touchLocked = false;
   uint32_t    tokensUsed  = 0;
   uint32_t    tokensMax   = 0;
   uint32_t    lastUpdateMs= 0;
+  uint32_t    uiHoldUntilMs = 0;
 };
 
 inline const char* stateName(MascotState s) {

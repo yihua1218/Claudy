@@ -19,5 +19,9 @@
 // Display brightness 0-255
 #define BRIGHTNESS      200
 
+// Touch is optional across T-Display-S3 variants. Enable only after confirming
+// the touch controller pins for your board.
+#define ENABLE_TOUCH    0
+
 // Auto-return to IDLE after this many ms of no updates (0 = never)
 #define IDLE_TIMEOUT_MS 60000
