@@ -56,6 +56,7 @@ $EDITOR firmware/config.h                       # 設定 WIFI_SSID 與 WIFI_PASS
 
 # 5. 從 Mac 端驗證
 curl http://claudy.local/state                   # GET — 取得裝置目前狀態（JSON）
+curl http://claudy.local/screenshot.bmp -o claudy.bmp
 ./scripts/test-state.sh                          # 在螢幕上循環顯示所有狀態
 
 # 6. 安裝 Claude Code hooks
@@ -67,18 +68,20 @@ curl http://claudy.local/state                   # GET — 取得裝置目前狀
 
 ## 狀態對應表
 
-| Claude Code 事件              | 吉祥物狀態 | 備註                                         |
-|-------------------------------|-----------|----------------------------------------------|
-| `SessionStart`                | 閒置      |                                              |
-| `UserPromptSubmit`            | 思考中    | 訊息 = 你輸入的提示詞前幾個字元                  |
-| `PreToolUse`                  | 工作中    | 工具標記 + 簡短輸入內容（檔案/指令/模式）         |
-| `PostToolUse`                 | 思考中    | 工具之間回到思考狀態                             |
-| `PostToolUseFailure`          | 錯誤      | 短暫閃爍後繼續下一個事件                         |
-| `Notification` / `Permission*` / `Elicitation` | 等待中 | 「核准 X？」提示 |
-| `Stop` / `TaskCompleted`      | 完成 → 閒置 | Bridge 3 秒後自動淡出                        |
-| `SessionEnd`                  | 閒置      |                                              |
+| Claude Code 事件                               | 吉祥物狀態  | 備註                                    |
+|------------------------------------------------|-------------|-----------------------------------------|
+| `SessionStart`                                 | 閒置        |                                         |
+| `UserPromptSubmit`                             | 思考中      | 訊息 = 你輸入的提示詞前幾個字元         |
+| `PreToolUse`                                   | 工作中      | 工具標記 + 簡短輸入內容（檔案/指令/模式） |
+| `PostToolUse`                                  | 思考中      | 工具之間回到思考狀態                    |
+| `PostToolUseFailure`                           | 錯誤        | 短暫閃爍後繼續下一個事件                |
+| `Notification` / `Permission*` / `Elicitation` | 等待中      | 「核准 X？」提示                           |
+| `Stop` / `TaskCompleted`                       | 完成 → 閒置 | Bridge 3 秒後自動淡出                   |
+| `SessionEnd`                                   | 閒置        |                                         |
 
 ## 無裝置測試
+
+瀏覽器 mock display、遠端主機設定、以及截圖方式請見[無裝置模擬選項](docs/no-device-simulation.zh-TW.md)。
 
 ```bash
 echo '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"ls"}}' \
@@ -91,23 +94,23 @@ POST 會靜默失敗（網路上沒有裝置），但可以驗證對應路徑是
 
 ### 韌體（`firmware/config.h`）
 
-| 定義              | 預設值            | 說明                                                           |
-|-------------------|------------------|----------------------------------------------------------------|
-| `WIFI_SSID`       | –                | 你的 WiFi SSID                                                 |
-| `WIFI_PASSWORD`   | –                | 你的 WiFi 密碼                                                 |
-| `MDNS_HOSTNAME`   | `claudy`         | mDNS 主機名稱（裝置可透過 `<hostname>.local` 存取）              |
-| `HTTP_PORT`       | `80`             |                                                                |
-| `AUTH_TOKEN`      | `""`             | 選填。若設定，請求必須帶上 `X-Claudy-Token: <value>`              |
-| `BRIGHTNESS`      | `200`            | 0–255                                                          |
-| `IDLE_TIMEOUT_MS` | `60000`          | 超過此時間沒有更新，自動回到閒置狀態                               |
+| 定義              | 預設值   | 說明                                               |
+|-------------------|----------|----------------------------------------------------|
+| `WIFI_SSID`       | –        | 你的 WiFi SSID                                     |
+| `WIFI_PASSWORD`   | –        | 你的 WiFi 密碼                                     |
+| `MDNS_HOSTNAME`   | `claudy` | mDNS 主機名稱（裝置可透過 `<hostname>.local` 存取）  |
+| `HTTP_PORT`       | `80`     |                                                    |
+| `AUTH_TOKEN`      | `""`     | 選填。若設定，請求必須帶上 `X-Claudy-Token: <value>` |
+| `BRIGHTNESS`      | `200`    | 0–255                                              |
+| `IDLE_TIMEOUT_MS` | `60000`  | 超過此時間沒有更新，自動回到閒置狀態                |
 
 ### Bridge（環境變數）
 
-| 變數                | 預設值                             |
-|--------------------|------------------------------------|
-| `CLAUDY_URL`       | `http://claudy.local/state`       |
-| `CLAUDY_TOKEN`     | 空白                               |
-| `CLAUDY_MAX_TOKENS`| `200000`（進度條的 context 預算）    |
+| 變數                | 預設值                          |
+|---------------------|---------------------------------|
+| `CLAUDY_URL`        | `http://claudy.local/state`     |
+| `CLAUDY_TOKEN`      | 空白                            |
+| `CLAUDY_MAX_TOKENS` | `200000`（進度條的 context 預算） |
 
 若要在 hooks 中使用這些變數，請在 `~/.zshenv` 中 export，這樣 Claude Code 啟動的每個 shell 都會繼承。
 
@@ -130,6 +133,10 @@ POST 會靜默失敗（網路上沒有裝置），但可以驗證對應路徑是
 
 回傳目前狀態 + 運行時間 + IP。
 
+### `GET /screenshot.bmp`
+
+下載目前繪製畫面的 24-bit BMP。中立範例截圖請見 [Claudy 狀態截圖展示](docs/state-screenshot-gallery.zh-TW.md)。
+
 ### `GET /`
 
 HTML 狀態頁面。
@@ -146,7 +153,7 @@ HTML 狀態頁面。
 `config.h` 中的 SSID/密碼有誤，或你的 WiFi 僅支援 5GHz（ESP32-S3 僅支援 2.4GHz）。
 
 **`claudy.local` 無法解析**
-mDNS 有時在開機後需要 5–10 秒。改用 IP 試試：`curl http://<螢幕上顯示的IP>/state`。若你的網路 mDNS 不穩定，將 `CLAUDY_URL` 設為 IP 位址。
+mDNS 有時在開機後需要 5–10 秒。改用裝置 IP 試試：`curl http://<claudy-ip>/state`。若你的網路 mDNS 不穩定，將 `CLAUDY_URL` 設為 `http://<claudy-ip>/state`。
 
 **Hooks 沒有觸發**
 執行 `install-hooks.sh` 後重新啟動 Claude Code。然後執行一個工具 — 你應該會看到吉祥物有反應。若要除錯，手動執行 `bridge/send_state.py` 並傳入範例事件。

@@ -56,6 +56,7 @@ $EDITOR firmware/config.h                       # set WIFI_SSID + WIFI_PASSWORD
 
 # 5. Verify from your Mac
 curl http://claudy.local/state                   # GET — current device state as JSON
+curl http://claudy.local/screenshot.bmp -o claudy.bmp
 ./scripts/test-state.sh                          # cycle through all states on the display
 
 # 6. Install Claude Code hooks
@@ -67,18 +68,20 @@ The mascot should now react in real time to anything you do in Claude Code.
 
 ## How the states map
 
-| Claude Code event           | Mascot state | Notes                                       |
-|-----------------------------|--------------|---------------------------------------------|
-| `SessionStart`              | Idle         |                                             |
-| `UserPromptSubmit`          | Thinking     | Message = first chars of your prompt        |
-| `PreToolUse`                | Working      | Tool badge + brief input (file/cmd/pattern) |
-| `PostToolUse`               | Thinking     | Returns to thinking between tools           |
-| `PostToolUseFailure`        | Error        | Brief flash before next event               |
-| `Notification` / `Permission*` / `Elicitation` | Waiting | "Approve X?" prompts |
-| `Stop` / `TaskCompleted`    | Done → Idle  | Bridge auto-fades after 3s                  |
-| `SessionEnd`                | Idle         |                                             |
+| Claude Code event                              | Mascot state | Notes                                       |
+|------------------------------------------------|--------------|---------------------------------------------|
+| `SessionStart`                                 | Idle         |                                             |
+| `UserPromptSubmit`                             | Thinking     | Message = first chars of your prompt        |
+| `PreToolUse`                                   | Working      | Tool badge + brief input (file/cmd/pattern) |
+| `PostToolUse`                                  | Thinking     | Returns to thinking between tools           |
+| `PostToolUseFailure`                           | Error        | Brief flash before next event               |
+| `Notification` / `Permission*` / `Elicitation` | Waiting      | "Approve X?" prompts                        |
+| `Stop` / `TaskCompleted`                       | Done → Idle  | Bridge auto-fades after 3s                  |
+| `SessionEnd`                                   | Idle         |                                             |
 
 ## Testing without a device
+
+See [No-Device Simulation Options](docs/no-device-simulation.md) for the browser mock display, remote-host setup, and screenshot guidance.
 
 ```bash
 echo '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"ls"}}' \
@@ -91,23 +94,23 @@ POST will silently fail (no device on the network) but the mapping path is exerc
 
 ### Firmware (`firmware/config.h`)
 
-| Define          | Default          | Meaning                                                        |
-|-----------------|------------------|----------------------------------------------------------------|
-| `WIFI_SSID`     | –                | Your WiFi SSID                                                 |
-| `WIFI_PASSWORD` | –                | Your WiFi password                                             |
-| `MDNS_HOSTNAME` | `claudy`         | mDNS hostname (device reachable at `<hostname>.local`)         |
-| `HTTP_PORT`     | `80`             |                                                                |
-| `AUTH_TOKEN`    | `""`             | Optional. If set, requests must send `X-Claudy-Token: <value>` |
-| `BRIGHTNESS`    | `200`            | 0–255                                                          |
-| `IDLE_TIMEOUT_MS` | `60000`        | Auto-return to Idle after this long with no updates            |
+| Define            | Default  | Meaning                                                        |
+|-------------------|----------|----------------------------------------------------------------|
+| `WIFI_SSID`       | –        | Your WiFi SSID                                                 |
+| `WIFI_PASSWORD`   | –        | Your WiFi password                                             |
+| `MDNS_HOSTNAME`   | `claudy` | mDNS hostname (device reachable at `<hostname>.local`)         |
+| `HTTP_PORT`       | `80`     |                                                                |
+| `AUTH_TOKEN`      | `""`     | Optional. If set, requests must send `X-Claudy-Token: <value>` |
+| `BRIGHTNESS`      | `200`    | 0–255                                                          |
+| `IDLE_TIMEOUT_MS` | `60000`  | Auto-return to Idle after this long with no updates            |
 
 ### Bridge (environment variables)
 
-| Var                | Default                          |
-|--------------------|----------------------------------|
-| `CLAUDY_URL`       | `http://claudy.local/state`      |
-| `CLAUDY_TOKEN`     | empty                            |
-| `CLAUDY_MAX_TOKENS`| `200000` (context budget for bar)|
+| Var                 | Default                           |
+|---------------------|-----------------------------------|
+| `CLAUDY_URL`        | `http://claudy.local/state`       |
+| `CLAUDY_TOKEN`      | empty                             |
+| `CLAUDY_MAX_TOKENS` | `200000` (context budget for bar) |
 
 To set these for hooks, export them in `~/.zshenv` so they're inherited by every shell Claude Code spawns.
 
@@ -130,6 +133,10 @@ All fields optional except `state`. Returns `{"ok":true}`.
 
 Returns current state + uptime + IP.
 
+### `GET /screenshot.bmp`
+
+Downloads the current rendered frame as a 24-bit BMP. See [Claudy State Screenshot Gallery](docs/state-screenshot-gallery.md) for neutral example captures.
+
 ### `GET /`
 
 HTML status page.
@@ -146,7 +153,7 @@ Make sure you're flashing the 16MB/PSRAM variant. The FQBN in `scripts/build.sh`
 SSID/password wrong in `config.h`, or your WiFi is 5GHz-only (ESP32-S3 is 2.4GHz only).
 
 **`claudy.local` doesn't resolve**
-mDNS sometimes takes 5–10s after boot. Try the IP instead: `curl http://<ip-shown-on-screen>/state`. Set `CLAUDY_URL` to the IP if mDNS is flaky on your network.
+mDNS sometimes takes 5–10s after boot. Try the device IP instead: `curl http://<claudy-ip>/state`. Set `CLAUDY_URL` to `http://<claudy-ip>/state` if mDNS is flaky on your network.
 
 **Hooks not firing**
 Restart Claude Code after `install-hooks.sh`. Then run a tool — you should see the mascot react. To debug, run `bridge/send_state.py` manually with a sample event.

@@ -38,6 +38,42 @@ mock server 實作：
 
 這已足夠驗證 hook mapping、狀態切換、`client`、工具標籤和 token bar，不需要實體硬體。
 
+### 取得螢幕截圖
+
+新版 ESP32-S3 韌體提供一個 best-effort framebuffer screenshot endpoint：
+
+```bash
+curl http://<claudy-ip>/screenshot.bmp -o claudy.bmp
+```
+
+這會把目前的 offscreen render sprite 下載成 24-bit BMP。裝置在線時，這很適合快速除錯。
+
+所有狀態的中立範例截圖可參考 [Claudy 狀態截圖展示](state-screenshot-gallery.zh-TW.md)。
+
+若需要可重現的文件截圖，建議用相同 `/state` payload 在瀏覽器 mock display 重現畫面，再截瀏覽器頁面。mock 流程比較容易自動化，也不受相機角度、反光、WiFi 時序或實體 LCD 觀感影響。
+
+啟動 mock server：
+
+```bash
+./scripts/mock-server.py
+```
+
+送出要截圖的狀態：
+
+```bash
+curl -X POST http://127.0.0.1:8765/state \
+  -H 'Content-Type: application/json' \
+  -d '{"state":"working","tool":"Bash","message":"screenshot test","client":"codex-vscode","tokens":{"used":42000,"max":200000}}'
+```
+
+接著開啟並截圖：
+
+```text
+http://127.0.0.1:8765/
+```
+
+截圖本身可用瀏覽器或作業系統的截圖工具完成。如果要捕捉實體 LCD 的真實觀感，就需要用相機拍攝；BMP endpoint 擷取的是 render sprite，不包含亮度、視角、反光等光學效果。
+
 ## 方案 2：從 Windows 瀏覽遠端 Linux 的 Mock Display
 
 在遠端 Linux 主機上讓 mock server 綁定所有介面：

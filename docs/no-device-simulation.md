@@ -38,6 +38,42 @@ The mock server implements:
 
 This is enough to validate hook mapping, state transitions, `client`, tool labels, and token bars without hardware.
 
+### Taking Screenshots
+
+Recent ESP32-S3 firmware exposes a best-effort framebuffer screenshot endpoint:
+
+```bash
+curl http://<claudy-ip>/screenshot.bmp -o claudy.bmp
+```
+
+This downloads the current offscreen render sprite as a 24-bit BMP. It is useful for quick debugging when the device is online.
+
+Neutral example captures for all states are available in [Claudy State Screenshot Gallery](state-screenshot-gallery.md).
+
+For repeatable documentation screenshots, reproduce the same state in the browser mock display and capture the browser page. The mock flow is easier to automate and does not depend on camera angle, glare, WiFi timing, or the physical LCD.
+
+Start the mock server:
+
+```bash
+./scripts/mock-server.py
+```
+
+Send the state you want to capture:
+
+```bash
+curl -X POST http://127.0.0.1:8765/state \
+  -H 'Content-Type: application/json' \
+  -d '{"state":"working","tool":"Bash","message":"screenshot test","client":"codex-vscode","tokens":{"used":42000,"max":200000}}'
+```
+
+Then open and capture:
+
+```text
+http://127.0.0.1:8765/
+```
+
+Use your browser or OS screenshot tool for the image. If you need to capture what the physical LCD actually looks like, use a camera; the BMP endpoint captures the rendered sprite, not optical LCD characteristics such as brightness, viewing angle, or glare.
+
 ## Option 2: Browser on Another Machine
 
 Run the mock server on the remote Linux host and bind to all interfaces:
