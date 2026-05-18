@@ -94,15 +94,17 @@ POST 會靜默失敗（網路上沒有裝置），但可以驗證對應路徑是
 
 ### 韌體（`firmware/config.h`）
 
-| 定義              | 預設值   | 說明                                               |
-|-------------------|----------|----------------------------------------------------|
-| `WIFI_SSID`       | –        | 你的 WiFi SSID                                     |
-| `WIFI_PASSWORD`   | –        | 你的 WiFi 密碼                                     |
-| `MDNS_HOSTNAME`   | `claudy` | mDNS 主機名稱（裝置可透過 `<hostname>.local` 存取）  |
-| `HTTP_PORT`       | `80`     |                                                    |
-| `AUTH_TOKEN`      | `""`     | 選填。若設定，請求必須帶上 `X-Claudy-Token: <value>` |
-| `BRIGHTNESS`      | `200`    | 0–255                                              |
-| `IDLE_TIMEOUT_MS` | `60000`  | 超過此時間沒有更新，自動回到閒置狀態                |
+| 定義              | 預設值   | 說明                                                   |
+|-------------------|----------|--------------------------------------------------------|
+| `WIFI_SSID`       | –        | 你的 WiFi SSID                                         |
+| `WIFI_PASSWORD`   | –        | 你的 WiFi 密碼                                         |
+| `MDNS_HOSTNAME`   | `claudy` | mDNS 主機名稱（裝置可透過 `<hostname>.local` 存取）      |
+| `HTTP_PORT`       | `80`     |                                                        |
+| `AUTH_TOKEN`      | `""`     | 選填。若設定，請求必須帶上 `X-Claudy-Token: <value>`     |
+| `BRIGHTNESS`      | `200`    | 0–255                                                  |
+| `ENABLE_TOUCH`    | `0`      | 選用 CST816 觸控支援。請先確認你的板子觸控腳位後再啟用。 |
+| `ENABLE_CODEX_UI` | `1`      | 顯示 Codex/client 視覺細節與觸控說明頁。                |
+| `IDLE_TIMEOUT_MS` | `60000`  | 超過此時間沒有更新，自動回到閒置狀態                    |
 
 ### Bridge（環境變數）
 
@@ -140,6 +142,18 @@ POST 會靜默失敗（網路上沒有裝置），但可以驗證對應路徑是
 ### `GET /`
 
 HTML 狀態頁面。
+
+## 觸控互動
+
+觸控是選用功能，因為不同 T-Display-S3 版本的觸控腳位可能不同。啟用 `ENABLE_TOUCH` 且偵測到 CST816 控制器後：
+
+- 點左側寵物區：觸發短暫的本地「Boop」動畫。
+- 點右側文字區：將目前畫面固定 30 秒。
+- 左右滑動：切換狀態、client info、觸控說明頁。
+- 上下滑動：調整亮度。
+- 長按：鎖定或解除鎖定觸控輸入。
+
+之後若要做螢幕上 approve，建議只在 Waiting/Approve 畫面啟用，而且採用長按再點擊之類的雙步確認，避免一般摸寵物時誤核准工具。
 
 ## 疑難排解
 

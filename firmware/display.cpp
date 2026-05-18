@@ -4,7 +4,7 @@
 #include "config.h"
 
 #ifndef ENABLE_CODEX_UI
-#define ENABLE_CODEX_UI 0
+#define ENABLE_CODEX_UI 1
 #endif
 
 #if ENABLE_CODEX_UI
@@ -198,7 +198,9 @@ static void drawSmallLine(const char* label, const char* value, int x, int y, in
 #endif
 
 void renderFrame() {
-  bool animating = mascotAnimating(g_state.state);
+  uint32_t now = millis();
+  bool pulseActive = now < g_state.mascotPulseUntilMs;
+  bool animating = mascotAnimating(g_state.state) || pulseActive;
   if (!s_dirty && !animating) return;
   s_dirty = false;
 
@@ -227,7 +229,26 @@ void renderFrame() {
 #if ENABLE_CODEX_UI
   drawCodexMotif(lx - 3, ly - 3, lw + 6, lh + 6);
 #endif
-  drawMascot(canvas, g_state.state, lx, ly, lw, lh);
+  int mascotX = lx;
+  int mascotY = ly;
+  int mascotW = lw;
+  int mascotH = lh;
+  if (pulseActive) {
+    uint32_t elapsed = 650 - (g_state.mascotPulseUntilMs - now);
+    uint8_t phase = elapsed / 65;
+    const int8_t bob[] = {0, -4, -7, -5, -1, 2, -2, 1, 0, 0};
+    const int8_t wag[] = {0, 2, -2, 3, -3, 2, -1, 1, 0, 0};
+    if (phase >= sizeof(bob)) phase = sizeof(bob) - 1;
+    mascotX += wag[phase];
+    mascotY += bob[phase];
+    if (phase >= 1 && phase <= 4) {
+      mascotX -= 2;
+      mascotY -= 2;
+      mascotW += 4;
+      mascotH += 4;
+    }
+  }
+  drawMascot(canvas, g_state.state, mascotX, mascotY, mascotW, mascotH);
 #if ENABLE_CODEX_UI
   drawTouchPill(lx, H - PAD - 14);
 #endif
@@ -275,7 +296,7 @@ void renderFrame() {
   } else if (g_state.uiView == 2) {
     canvas.setFont(&fonts::Font2);
     canvas.setTextColor(0xBDF7, TFT_BLACK);
-    canvas.drawString("tap mascot: view", tx, cursorY);
+    canvas.drawString("tap mascot: boop", tx, cursorY);
     canvas.drawString("tap text: pin 30s", tx, cursorY + 16);
     canvas.drawString("swipe up/down: light", tx, cursorY + 32);
     canvas.drawString("hold: lock touch", tx, cursorY + 48);

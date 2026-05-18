@@ -94,15 +94,17 @@ POST will silently fail (no device on the network) but the mapping path is exerc
 
 ### Firmware (`firmware/config.h`)
 
-| Define            | Default  | Meaning                                                        |
-|-------------------|----------|----------------------------------------------------------------|
-| `WIFI_SSID`       | –        | Your WiFi SSID                                                 |
-| `WIFI_PASSWORD`   | –        | Your WiFi password                                             |
-| `MDNS_HOSTNAME`   | `claudy` | mDNS hostname (device reachable at `<hostname>.local`)         |
-| `HTTP_PORT`       | `80`     |                                                                |
-| `AUTH_TOKEN`      | `""`     | Optional. If set, requests must send `X-Claudy-Token: <value>` |
-| `BRIGHTNESS`      | `200`    | 0–255                                                          |
-| `IDLE_TIMEOUT_MS` | `60000`  | Auto-return to Idle after this long with no updates            |
+| Define            | Default  | Meaning                                                                                    |
+|-------------------|----------|--------------------------------------------------------------------------------------------|
+| `WIFI_SSID`       | –        | Your WiFi SSID                                                                             |
+| `WIFI_PASSWORD`   | –        | Your WiFi password                                                                         |
+| `MDNS_HOSTNAME`   | `claudy` | mDNS hostname (device reachable at `<hostname>.local`)                                     |
+| `HTTP_PORT`       | `80`     |                                                                                            |
+| `AUTH_TOKEN`      | `""`     | Optional. If set, requests must send `X-Claudy-Token: <value>`                             |
+| `BRIGHTNESS`      | `200`    | 0–255                                                                                      |
+| `ENABLE_TOUCH`    | `0`      | Optional CST816 touch support. Enable only after confirming the touch pins for your board. |
+| `ENABLE_CODEX_UI` | `1`      | Shows Codex/client-specific visual details and touch help views.                           |
+| `IDLE_TIMEOUT_MS` | `60000`  | Auto-return to Idle after this long with no updates                                        |
 
 ### Bridge (environment variables)
 
@@ -140,6 +142,18 @@ Downloads the current rendered frame as a 24-bit BMP. See [Claudy State Screensh
 ### `GET /`
 
 HTML status page.
+
+## Touch Interactions
+
+Touch support is optional because T-Display-S3 variants may expose different touch wiring. Once `ENABLE_TOUCH` is enabled and the CST816 controller is detected:
+
+- Tap the mascot area to trigger a short local "boop" animation.
+- Tap the text area to pin the current display for 30 seconds.
+- Swipe left or right to switch between status, client info, and touch help views.
+- Swipe up or down to adjust brightness.
+- Long-press to lock or unlock touch input.
+
+Future approve-from-screen support should use a waiting-only view with a deliberate confirmation gesture, such as long-press then tap, so normal mascot taps can never approve a tool by accident.
 
 ## Troubleshooting
 

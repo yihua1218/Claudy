@@ -23,5 +23,8 @@
 // the touch controller pins for your board.
 #define ENABLE_TOUCH    0
 
+// Shows Codex/client-specific visual details and touch help views.
+#define ENABLE_CODEX_UI 1
+
 // Auto-return to IDLE after this many ms of no updates (0 = never)
 #define IDLE_TIMEOUT_MS 60000

@@ -38,6 +38,7 @@ struct AppState {
   uint32_t    tokensMax   = 0;
   uint32_t    lastUpdateMs= 0;
   uint32_t    uiHoldUntilMs = 0;
+  uint32_t    mascotPulseUntilMs = 0;
 };
 
 inline const char* stateName(MascotState s) {

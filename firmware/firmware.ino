@@ -63,8 +63,8 @@ void loop() {
       switch (tev.gesture) {
         case TOUCH_TAP:
           if (tev.x < 140) {
-            g_state.uiView = (g_state.uiView + 1) % 3;
-            snprintf(g_state.touchHint, sizeof(g_state.touchHint), "View %u", g_state.uiView + 1);
+            g_state.mascotPulseUntilMs = millis() + 650;
+            snprintf(g_state.touchHint, sizeof(g_state.touchHint), "Boop!");
           } else {
             g_state.uiHoldUntilMs = millis() + 30000;
             snprintf(g_state.touchHint, sizeof(g_state.touchHint), "Pinned 30s");
@@ -124,6 +124,9 @@ void loop() {
   static MascotState   lastAnimState = STATE_BOOT;
   unsigned long now = millis();
   uint32_t interval = mascotAnimInterval(g_state.state);
+  if (now < g_state.mascotPulseUntilMs && (interval == 0 || interval > 40)) {
+    interval = 40;
+  }
 
   if (g_state.state != lastAnimState) {
     lastAnimState = g_state.state;
