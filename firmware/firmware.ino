@@ -11,15 +11,53 @@
 #define ENABLE_TOUCH 0
 #endif
 
+#ifndef POWER_SAVE_ENABLED
+#define POWER_SAVE_ENABLED 1
+#endif
+
+#ifndef POWER_SAVE_TIMEOUT_MS
+#define POWER_SAVE_TIMEOUT_MS 300000
+#endif
+
+#ifndef POWER_SAVE_BRIGHTNESS
+#define POWER_SAVE_BRIGHTNESS 24
+#endif
+
 AppState g_state;
+
+uint8_t clampDisplayBrightness(int value) {
+  if (value < 12) return 12;
+  if (value > 255) return 255;
+  return (uint8_t)value;
+}
+
+void applyBrightness(uint8_t value) {
+  g_state.displayBrightness = clampDisplayBrightness(value);
+  tft.setBrightness(g_state.displayBrightness);
+}
+
+void markActivity(bool restoreBrightness) {
+  g_state.lastActivityMs = millis();
+  if (restoreBrightness &&
+      (g_state.powerSaveDimmed || g_state.displayBrightness != g_state.brightness)) {
+    g_state.powerSaveDimmed = false;
+    applyBrightness(g_state.brightness);
+    requestRedraw();
+  }
+}
 
 void setup() {
   Serial.begin(115200);
   delay(100);
   Serial.println("\n=== Claudy boot ===");
-  g_state.brightness = BRIGHTNESS;
+  g_state.brightness = clampDisplayBrightness(BRIGHTNESS);
+  g_state.displayBrightness = g_state.brightness;
+  g_state.powerSaveEnabled = POWER_SAVE_ENABLED != 0;
+  g_state.powerSaveTimeoutMs = POWER_SAVE_TIMEOUT_MS;
+  g_state.powerSaveBrightness = clampDisplayBrightness(POWER_SAVE_BRIGHTNESS);
+  g_state.lastActivityMs = millis();
 
-  displayBegin(BRIGHTNESS);
+  displayBegin(g_state.brightness);
   g_state.state = STATE_BOOT;
   strncpy(g_state.message, "Connecting WiFi...", sizeof(g_state.message));
   requestRedraw();
@@ -53,6 +91,7 @@ void loop() {
   tev = touchLoop();
 #endif
   if (tev.gesture != TOUCH_NONE) {
+    markActivity(true);
     if (tev.gesture == TOUCH_LONG_PRESS) {
       g_state.touchLocked = !g_state.touchLocked;
       snprintf(g_state.touchHint, sizeof(g_state.touchHint),
@@ -81,13 +120,15 @@ void loop() {
         case TOUCH_SWIPE_UP:
           if (g_state.brightness < 240) g_state.brightness += 15;
           else g_state.brightness = 255;
-          tft.setBrightness(g_state.brightness);
+          g_state.powerSaveDimmed = false;
+          applyBrightness(g_state.brightness);
           snprintf(g_state.touchHint, sizeof(g_state.touchHint), "Bright %u", g_state.brightness);
           break;
         case TOUCH_SWIPE_DOWN:
           if (g_state.brightness > 30) g_state.brightness -= 15;
           else g_state.brightness = 12;
-          tft.setBrightness(g_state.brightness);
+          g_state.powerSaveDimmed = false;
+          applyBrightness(g_state.brightness);
           snprintf(g_state.touchHint, sizeof(g_state.touchHint), "Dim %u", g_state.brightness);
           break;
         case TOUCH_SWIPE_LEFT:
@@ -101,6 +142,16 @@ void loop() {
       g_state.uiHoldUntilMs = millis() + 1800;
       requestRedraw();
     }
+  }
+
+  if (g_state.powerSaveEnabled &&
+      !g_state.powerSaveDimmed &&
+      g_state.powerSaveTimeoutMs > 0 &&
+      g_state.lastActivityMs > 0 &&
+      millis() - g_state.lastActivityMs > g_state.powerSaveTimeoutMs) {
+    g_state.powerSaveDimmed = true;
+    applyBrightness(g_state.powerSaveBrightness);
+    requestRedraw();
   }
 
   // Auto-return to IDLE after timeout

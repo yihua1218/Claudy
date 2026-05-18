@@ -12,6 +12,9 @@
 #include <soc/soc.h>
 
 extern AppState g_state;
+extern uint8_t clampDisplayBrightness(int value);
+extern void applyBrightness(uint8_t value);
+extern void markActivity(bool restoreBrightness);
 
 static WebServer server(HTTP_PORT);
 static bool s_connected = false;
@@ -63,6 +66,7 @@ static void handleState() {
     g_state.tokensMax  = maxv;
   }
   g_state.lastUpdateMs = millis();
+  markActivity(true);
   requestRedraw();
 
   server.send(200, "application/json", "{\"ok\":true}");
@@ -79,12 +83,70 @@ static void handleGet() {
   doc["touch"]["locked"]  = g_state.touchLocked;
   doc["ui"]["view"]       = g_state.uiView;
   doc["ui"]["brightness"] = g_state.brightness;
+  doc["ui"]["display_brightness"] = g_state.displayBrightness;
+  doc["power"]["enabled"]       = g_state.powerSaveEnabled;
+  doc["power"]["dimmed"]        = g_state.powerSaveDimmed;
+  doc["power"]["timeout_ms"]    = g_state.powerSaveTimeoutMs;
+  doc["power"]["brightness"]    = g_state.powerSaveBrightness;
   doc["tokens"]["used"] = g_state.tokensUsed;
   doc["tokens"]["max"]  = g_state.tokensMax;
   doc["uptime_ms"]      = millis();
   doc["ip"] = WiFi.localIP().toString();
   String out;
   serializeJson(doc, out);
+  server.send(200, "application/json", out);
+}
+
+static void handlePowerGet() {
+  StaticJsonDocument<256> doc;
+  doc["enabled"] = g_state.powerSaveEnabled;
+  doc["dimmed"] = g_state.powerSaveDimmed;
+  doc["timeout_ms"] = g_state.powerSaveTimeoutMs;
+  doc["brightness"] = g_state.powerSaveBrightness;
+  doc["active_brightness"] = g_state.brightness;
+  doc["display_brightness"] = g_state.displayBrightness;
+  doc["last_activity_ms"] = g_state.lastActivityMs;
+  doc["uptime_ms"] = millis();
+  String out;
+  serializeJson(doc, out);
+  server.send(200, "application/json", out);
+}
+
+static void handlePowerPost() {
+  if (!authOk()) { server.send(401, "text/plain", "auth"); return; }
+
+  String body = server.arg("plain");
+  if (body.length() == 0) { server.send(400, "text/plain", "empty body"); return; }
+
+  StaticJsonDocument<256> doc;
+  DeserializationError err = deserializeJson(doc, body);
+  if (err) { server.send(400, "text/plain", err.c_str()); return; }
+
+  if (doc["enabled"].is<bool>()) {
+    g_state.powerSaveEnabled = doc["enabled"].as<bool>();
+  }
+  if (doc["timeout_ms"].is<uint32_t>()) {
+    g_state.powerSaveTimeoutMs = doc["timeout_ms"].as<uint32_t>();
+  }
+  if (doc["brightness"].is<int>()) {
+    g_state.powerSaveBrightness = clampDisplayBrightness(doc["brightness"].as<int>());
+  }
+  if (doc["active_brightness"].is<int>()) {
+    g_state.brightness = clampDisplayBrightness(doc["active_brightness"].as<int>());
+  }
+
+  markActivity(true);
+
+  StaticJsonDocument<256> outDoc;
+  outDoc["ok"] = true;
+  outDoc["enabled"] = g_state.powerSaveEnabled;
+  outDoc["dimmed"] = g_state.powerSaveDimmed;
+  outDoc["timeout_ms"] = g_state.powerSaveTimeoutMs;
+  outDoc["brightness"] = g_state.powerSaveBrightness;
+  outDoc["active_brightness"] = g_state.brightness;
+  outDoc["display_brightness"] = g_state.displayBrightness;
+  String out;
+  serializeJson(outDoc, out);
   server.send(200, "application/json", out);
 }
 
@@ -186,6 +248,10 @@ static void handleRoot() {
   html += "</p><p>Message: ";
   html += g_state.message;
   html += "</p><p><a href=\"/screenshot.bmp\">screenshot.bmp</a></p>";
+  html += "<p>Power save: ";
+  html += g_state.powerSaveEnabled ? "on" : "off";
+  html += g_state.powerSaveDimmed ? " (dimmed)" : "";
+  html += "</p>";
   html += "<p>Control: <code>POST /reboot</code>, <code>POST /bootloader</code></p>";
   html += "</p><pre>curl -X POST http://";
   html += MDNS_HOSTNAME;
@@ -227,6 +293,8 @@ bool netBegin() {
   server.on("/",       HTTP_GET,  handleRoot);
   server.on("/state",  HTTP_GET,  handleGet);
   server.on("/state",  HTTP_POST, handleState);
+  server.on("/power",  HTTP_GET,  handlePowerGet);
+  server.on("/power",  HTTP_POST, handlePowerPost);
   server.on("/screenshot.bmp", HTTP_GET, handleScreenshot);
   server.on("/reboot", HTTP_POST, handleReboot);
   server.on("/bootloader", HTTP_POST, handleBootloader);

@@ -94,17 +94,20 @@ POST will silently fail (no device on the network) but the mapping path is exerc
 
 ### Firmware (`firmware/config.h`)
 
-| Define            | Default  | Meaning                                                                                    |
-|-------------------|----------|--------------------------------------------------------------------------------------------|
-| `WIFI_SSID`       | –        | Your WiFi SSID                                                                             |
-| `WIFI_PASSWORD`   | –        | Your WiFi password                                                                         |
-| `MDNS_HOSTNAME`   | `claudy` | mDNS hostname (device reachable at `<hostname>.local`)                                     |
-| `HTTP_PORT`       | `80`     |                                                                                            |
-| `AUTH_TOKEN`      | `""`     | Optional. If set, requests must send `X-Claudy-Token: <value>`                             |
-| `BRIGHTNESS`      | `200`    | 0–255                                                                                      |
-| `ENABLE_TOUCH`    | `0`      | Optional CST816 touch support. Enable only after confirming the touch pins for your board. |
-| `ENABLE_CODEX_UI` | `1`      | Shows Codex/client-specific visual details and touch help views.                           |
-| `IDLE_TIMEOUT_MS` | `60000`  | Auto-return to Idle after this long with no updates                                        |
+| Define                  | Default  | Meaning                                                                                    |
+|-------------------------|----------|--------------------------------------------------------------------------------------------|
+| `WIFI_SSID`             | –        | Your WiFi SSID                                                                             |
+| `WIFI_PASSWORD`         | –        | Your WiFi password                                                                         |
+| `MDNS_HOSTNAME`         | `claudy` | mDNS hostname (device reachable at `<hostname>.local`)                                     |
+| `HTTP_PORT`             | `80`     |                                                                                            |
+| `AUTH_TOKEN`            | `""`     | Optional. If set, requests must send `X-Claudy-Token: <value>`                             |
+| `BRIGHTNESS`            | `200`    | 0–255                                                                                      |
+| `POWER_SAVE_ENABLED`    | `1`      | Dim the display after inactivity                                                           |
+| `POWER_SAVE_TIMEOUT_MS` | `300000` | Inactivity delay before dimming                                                            |
+| `POWER_SAVE_BRIGHTNESS` | `24`     | Dimmed brightness, clamped to 12–255                                                       |
+| `ENABLE_TOUCH`          | `0`      | Optional CST816 touch support. Enable only after confirming the touch pins for your board. |
+| `ENABLE_CODEX_UI`       | `1`      | Shows Codex/client-specific visual details and touch help views.                           |
+| `IDLE_TIMEOUT_MS`       | `60000`  | Auto-return to Idle after this long with no updates                                        |
 
 ### Bridge (environment variables)
 
@@ -134,6 +137,25 @@ All fields optional except `state`. Returns `{"ok":true}`.
 ### `GET /state`
 
 Returns current state + uptime + IP.
+
+### `GET /power`
+
+Returns power-save settings and whether the display is currently dimmed.
+
+### `POST /power`
+
+Updates power-save settings:
+
+```json
+{
+  "enabled": true,
+  "timeout_ms": 300000,
+  "brightness": 24,
+  "active_brightness": 200
+}
+```
+
+All fields are optional. `brightness` and `active_brightness` are clamped to 12–255. Posting a new state to `/state` or touching the screen restores `active_brightness`.
 
 ### `GET /screenshot.bmp`
 

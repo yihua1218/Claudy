@@ -94,17 +94,20 @@ POST 會靜默失敗（網路上沒有裝置），但可以驗證對應路徑是
 
 ### 韌體（`firmware/config.h`）
 
-| 定義              | 預設值   | 說明                                                   |
-|-------------------|----------|--------------------------------------------------------|
-| `WIFI_SSID`       | –        | 你的 WiFi SSID                                         |
-| `WIFI_PASSWORD`   | –        | 你的 WiFi 密碼                                         |
-| `MDNS_HOSTNAME`   | `claudy` | mDNS 主機名稱（裝置可透過 `<hostname>.local` 存取）      |
-| `HTTP_PORT`       | `80`     |                                                        |
-| `AUTH_TOKEN`      | `""`     | 選填。若設定，請求必須帶上 `X-Claudy-Token: <value>`     |
-| `BRIGHTNESS`      | `200`    | 0–255                                                  |
-| `ENABLE_TOUCH`    | `0`      | 選用 CST816 觸控支援。請先確認你的板子觸控腳位後再啟用。 |
-| `ENABLE_CODEX_UI` | `1`      | 顯示 Codex/client 視覺細節與觸控說明頁。                |
-| `IDLE_TIMEOUT_MS` | `60000`  | 超過此時間沒有更新，自動回到閒置狀態                    |
+| 定義                    | 預設值   | 說明                                                   |
+|-------------------------|----------|--------------------------------------------------------|
+| `WIFI_SSID`             | –        | 你的 WiFi SSID                                         |
+| `WIFI_PASSWORD`         | –        | 你的 WiFi 密碼                                         |
+| `MDNS_HOSTNAME`         | `claudy` | mDNS 主機名稱（裝置可透過 `<hostname>.local` 存取）      |
+| `HTTP_PORT`             | `80`     |                                                        |
+| `AUTH_TOKEN`            | `""`     | 選填。若設定，請求必須帶上 `X-Claudy-Token: <value>`     |
+| `BRIGHTNESS`            | `200`    | 0–255                                                  |
+| `POWER_SAVE_ENABLED`    | `1`      | 閒置過久後自動降低螢幕亮度                             |
+| `POWER_SAVE_TIMEOUT_MS` | `300000` | 進入低亮度前的閒置時間                                 |
+| `POWER_SAVE_BRIGHTNESS` | `24`     | 省電低亮度，會限制在 12–255                             |
+| `ENABLE_TOUCH`          | `0`      | 選用 CST816 觸控支援。請先確認你的板子觸控腳位後再啟用。 |
+| `ENABLE_CODEX_UI`       | `1`      | 顯示 Codex/client 視覺細節與觸控說明頁。                |
+| `IDLE_TIMEOUT_MS`       | `60000`  | 超過此時間沒有更新，自動回到閒置狀態                    |
 
 ### Bridge（環境變數）
 
@@ -134,6 +137,25 @@ POST 會靜默失敗（網路上沒有裝置），但可以驗證對應路徑是
 ### `GET /state`
 
 回傳目前狀態 + 運行時間 + IP。
+
+### `GET /power`
+
+回傳省電設定，以及目前螢幕是否已經變暗。
+
+### `POST /power`
+
+更新省電設定：
+
+```json
+{
+  "enabled": true,
+  "timeout_ms": 300000,
+  "brightness": 24,
+  "active_brightness": 200
+}
+```
+
+所有欄位皆為選填。`brightness` 和 `active_brightness` 會被限制在 12–255。只要收到新的 `/state` 狀態，或使用者碰觸螢幕，就會恢復到 `active_brightness`。
 
 ### `GET /screenshot.bmp`
 

@@ -32,11 +32,17 @@ struct AppState {
   char        touchHint[32] = "";
   uint8_t     uiView      = 0;     // 0=status, 1=client info, 2=touch help
   uint8_t     brightness  = 200;
+  uint8_t     displayBrightness = 200;
+  uint8_t     powerSaveBrightness = 24;
   bool        touchPresent= false;
   bool        touchLocked = false;
+  bool        powerSaveEnabled = true;
+  bool        powerSaveDimmed = false;
   uint32_t    tokensUsed  = 0;
   uint32_t    tokensMax   = 0;
   uint32_t    lastUpdateMs= 0;
+  uint32_t    lastActivityMs = 0;
+  uint32_t    powerSaveTimeoutMs = 300000;
   uint32_t    uiHoldUntilMs = 0;
   uint32_t    mascotPulseUntilMs = 0;
 };

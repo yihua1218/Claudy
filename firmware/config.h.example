@@ -19,6 +19,12 @@
 // Display brightness 0-255
 #define BRIGHTNESS      200
 
+// Dim the display after inactivity. The dim brightness is clamped to 12-255
+// so touch gestures cannot make the screen look fully off by accident.
+#define POWER_SAVE_ENABLED       1
+#define POWER_SAVE_TIMEOUT_MS    300000
+#define POWER_SAVE_BRIGHTNESS    24
+
 // Touch is optional across T-Display-S3 variants. Enable only after confirming
 // the touch controller pins for your board.
 #define ENABLE_TOUCH    0
